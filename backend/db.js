@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import {Pool} from "pg";
 
 export const pool = new Pool({
   host: process.env.POSTGRES_HOST,
@@ -7,5 +7,5 @@ export const pool = new Pool({
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   max: 10,
-  idleTimeoutMillis: 10000
+  idleTimeoutMillis: 10000,
 });
