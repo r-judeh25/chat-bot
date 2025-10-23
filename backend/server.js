@@ -29,3 +29,22 @@ app.post("/api/auth/signup", async (req, res) => {
     res.status(500).json({ error: "server error" });
   }
 });
+
+
+// Signin - Verify password when user logs in. 
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: "email and password required" });
+
+  const { rows } = await pool.query(
+    `SELECT id, email, name, password_hash FROM users WHERE email=$1`,
+    [email]
+  );
+  if (!rows.length) return res.status(401).json({ error: "invalid credentials" });
+
+  const ok = await verifyPassword(password, rows[0].password_hash);
+  if (!ok) return res.status(401).json({ error: "invalid credentials" });
+
+  const { password_hash, ...publicFields } = rows[0];
+  res.json({ user: publicFields });
+});
