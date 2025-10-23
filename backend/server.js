@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import "dotenv/config.js";
 import express from "express";
 import {pool} from "./db.js";
+import {signAccess, requireAuth} from "./jwt.js";
 
 // Write helper functions to hash and verify passwords
 export const hashPassword = (plain) => bcrypt.hash(plain, 12);
@@ -10,7 +11,7 @@ export const verifyPassword = (plain, hash) => bcrypt.compare(plain, hash);
 const app = express();
 app.use(express.json());
 
-// Signup - Add user's email and password when they first sign up. Hashed password is only stored.
+// Signup - Add user's email and password when they first sign up. Only hashed password is stored.
 app.post("/api/auth/signup", async (req, res) => {
   const {email, password, name} = req.body || {};
   if (!email || !password) return res.status(400).json({error: "email and password required"});
@@ -22,7 +23,13 @@ app.post("/api/auth/signup", async (req, res) => {
       VALUES ($1,$2,$3) RETURNING id, email, name, created_at`,
       [email, pwHash, name || null]
     );
-    res.json({user: rows[0]});
+
+    const user = rows[0];
+
+    // Issue JWT token for the user
+    const access = signAccess({sub: user.id});
+
+    res.json({access_token: access, user});
   } catch (e) {
     if (e.code === "23505") return res.status(409).json({error: "email already exists"});
     res.status(500).json({error: "server error"});
@@ -40,11 +47,24 @@ app.post("/api/auth/login", async (req, res) => {
   );
   if (!rows.length) return res.status(401).json({error: "invalid credentials"});
 
+  const user = rows[0];
   const ok = await verifyPassword(password, rows[0].password_hash);
   if (!ok) return res.status(401).json({error: "invalid credentials"});
 
+  // Issue JWT token to the user
+  const access = signAccess({sub: user.id});
+
   const {password_hash, ...publicFields} = rows[0];
-  res.json({user: publicFields});
+  res.json({access_token: access, user: publicFields});
+});
+
+// Chatbot token - only given to authorized users
+app.post("/api/chatbot/token", requireAuth, (req, res) => {
+  const {sessionKey} = req.body || {};
+
+  const sub = req.user?.id || `anon:${sessionKey}`;
+  const chatbotToken = signAccess({type: "chatbot", sessionId: sessionKey, sub}, 10 * 60);
+  res.json({token: chatbotToken});
 });
 
 const PORT = process.env.PORT || 3001;
