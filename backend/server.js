@@ -48,3 +48,6 @@ app.post("/api/auth/login", async (req, res) => {
   const { password_hash, ...publicFields } = rows[0];
   res.json({ user: publicFields });
 });
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`API on :${PORT}`));
